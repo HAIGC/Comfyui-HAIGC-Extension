@@ -48,6 +48,11 @@ ComfyUI/
 - 作者：HAIGC  
 - 微信：HAIGC1994
 
+## 相关链接
+- 工作流体验地址：`https://www.runninghub.cn/post/2014536001888198657/inviteCode=rh-v1127`
+- 推荐 ComfyUI 云平台，通过这个地址注册送 1000 点算力：`https://www.runninghub.cn/user-center/1887871050510716930/webapp?inviteCode=rh-v1127`
+- 已注册还未绑定邀请码可绑定邀请码：rh-v1127 赠送 1000 点算力
+
 ---
 
 <details>
@@ -100,5 +105,10 @@ ComfyUI/
 ## Author
 - Author: HAIGC  
 - WeChat: HAIGC1994
+
+## Links
+- Workflow demo: `https://www.runninghub.ai/post/2014536001888198657/inviteCode=rh-v1127`
+- Recommended ComfyUI cloud platform (get 1000 compute credits on signup): `https://www.runninghub.ai/user-center/1887871050510716930/webapp?inviteCode=rh-v1127`
+- If already registered, bind invite code rh-v1127 to receive 1000 compute credits
 
 </details>
