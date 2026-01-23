@@ -1,6 +1,6 @@
 # ComfyUI HAIGC Highlight Extension
 
-[English](#english)
+[展开界面](#english)
 
 ## 简介
 本扩展用于在 ComfyUI 中突出显示当前正在运行的节点，提供更醒目的高亮边框与呼吸灯效果，适合节点较多的工作流快速定位执行位置。
@@ -51,14 +51,14 @@ ComfyUI/
 - 微信：HAIGC1994
 
 ## 相关链接
-- 工作流体验地址：`https://www.runninghub.cn/post/2014536001888198657/inviteCode=rh-v1127`
-- 推荐 ComfyUI 云平台，通过这个地址注册送 1000 点算力：`https://www.runninghub.cn/user-center/1887871050510716930/webapp?inviteCode=rh-v1127`
+- 工作流体验地址：https://www.runninghub.cn/post/2014536001888198657/inviteCode=rh-v1127
+- 推荐 ComfyUI 云平台，通过这个地址注册送 1000 点算力：https://www.runninghub.cn/user-center/1887871050510716930/webapp?inviteCode=rh-v1127
 - 已注册还未绑定邀请码可绑定邀请码：rh-v1127 赠送 1000 点算力
 
 ---
 
 <details>
-<summary><strong>English (Click to Expand)</strong></summary>
+<summary><strong>展开界面</strong></summary>
 
 <a id="english"></a>
 
@@ -111,8 +111,8 @@ ComfyUI/
 - WeChat: HAIGC1994
 
 ## Links
-- Workflow demo: `https://www.runninghub.ai/post/2014536001888198657/inviteCode=rh-v1127`
-- Recommended ComfyUI cloud platform (get 1000 compute credits on signup): `https://www.runninghub.ai/user-center/1887871050510716930/webapp?inviteCode=rh-v1127`
+- Workflow demo: https://www.runninghub.ai/post/2014536001888198657/inviteCode=rh-v1127
+- Recommended ComfyUI cloud platform (get 1000 compute credits on signup): https://www.runninghub.ai/user-center/1887871050510716930/webapp?inviteCode=rh-v1127
 - If already registered, bind invite code rh-v1127 to receive 1000 compute credits
 
 </details>
