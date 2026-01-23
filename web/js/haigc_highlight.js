@@ -15,12 +15,45 @@ app.registerExtension({
             const n = Number(value);
             return Number.isFinite(n) ? n : fallback;
         };
+        const normalizeHex = (value, fallback) => {
+            if (typeof value !== "string") return fallback;
+            const v = value.trim();
+            return /^#([0-9a-fA-F]{6})$/.test(v) ? v : fallback;
+        };
+        const clamp01 = (value, fallback) => {
+            const n = coerceNumber(value, fallback);
+            if (n < 0) return 0;
+            if (n > 1) return 1;
+            return n;
+        };
+        const formatElapsed = (ms) => {
+            const totalSeconds = Math.max(0, ms / 1000);
+            if (totalSeconds < 60) return `${totalSeconds.toFixed(1)}s`;
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = (totalSeconds % 60).toFixed(1).padStart(4, "0");
+            return `${minutes}:${seconds}s`;
+        };
 
         let highlightEnabled = true;
         let breathingEnabled = true;
+        let autoBreathingEnabled = true;
         let breathingPeriodMs = 1885;
         let breathingStrength = 60;
         let breathingColor = "#22FF22";
+        let breathingSizeScale = 1;
+        let breathingBrightness = 1;
+        let timeEnabled = true;
+        let timeColor = "#22FF22";
+        let timeBgOpacity = 0.55;
+        let timeShadowOpacity = 0.98;
+        let runningNodeId = null;
+        let runningStartTime = 0;
+        let lastRunningNodeId = null;
+        let lastMouseMoveTime = 0;
+        let mouseBreathPeriodMs = 0;
+        let mouseBreathPhaseStart = 0;
+        let mouseListenerAttached = false;
+        let tickHandle = null;
 
         if (app.ui?.settings?.addSetting) {
             const highlightSetting = app.ui.settings.addSetting({
@@ -46,6 +79,18 @@ app.registerExtension({
                 },
             });
             breathingEnabled = coerceBool(enabledSetting?.value, true);
+
+            const autoBreathingSetting = app.ui.settings.addSetting({
+                id: "HAIGC.Highlight.Breathing.Auto",
+                name: "HAIGC 高亮：自动呼吸",
+                type: "boolean",
+                defaultValue: true,
+                onChange(value) {
+                    autoBreathingEnabled = coerceBool(value, true);
+                    app.graph?.setDirtyCanvas?.(true, true);
+                },
+            });
+            autoBreathingEnabled = coerceBool(autoBreathingSetting?.value, true);
 
             const periodSetting = app.ui.settings.addSetting({
                 id: "HAIGC.Highlight.Breathing.PeriodMs",
@@ -156,6 +201,114 @@ app.registerExtension({
             });
             breathingStrength = coerceNumber(strengthSetting?.value, 60);
 
+            const sizeSetting = app.ui.settings.addSetting({
+                id: "HAIGC.Highlight.Breathing.Size",
+                name: "HAIGC 高亮：呼吸大小",
+                defaultValue: 1,
+                type: () => {
+                    const id = "HAIGC-Highlight-Breathing-Size";
+                    const input = $el("input", {
+                        id,
+                        type: "number",
+                        min: 0.2,
+                        max: 3,
+                        step: 0.1,
+                        value: coerceNumber(sizeSetting.value, 1),
+                        style: { 
+                            width: "80px",
+                            padding: "2px 6px",
+                            borderRadius: "4px",
+                            border: "1px solid var(--border-color, #333)",
+                            backgroundColor: "var(--comfy-input-bg, #222)",
+                            color: "var(--input-text, #ddd)"
+                        },
+                        oninput: (e) => {
+                            let val = coerceNumber(e.target.value, 1);
+                            if (val < 0.2) val = 0.2;
+                            if (val > 3) val = 3;
+                            breathingSizeScale = val;
+                            app.graph?.setDirtyCanvas?.(true, true);
+                        },
+                        onchange: (e) => {
+                            let val = coerceNumber(e.target.value, 1);
+                            if (val < 0.2) val = 0.2;
+                            if (val > 3) val = 3;
+                            sizeSetting.value = val;
+                            breathingSizeScale = val;
+                        },
+                         onkeydown: (e) => {
+                            e.stopPropagation();
+                        }
+                    });
+                    return $el("tr", [
+                        $el("td", [$el("label", { for: id, textContent: "HAIGC 高亮：呼吸大小:" })]),
+                        $el("td", [input]),
+                    ]);
+                },
+                onChange(value) {
+                    let val = coerceNumber(value, 1);
+                    if (val < 0.2) val = 0.2;
+                    if (val > 3) val = 3;
+                    breathingSizeScale = val;
+                    app.graph?.setDirtyCanvas?.(true, true);
+                },
+            });
+            breathingSizeScale = coerceNumber(sizeSetting?.value, 1);
+
+            const brightnessSetting = app.ui.settings.addSetting({
+                id: "HAIGC.Highlight.Breathing.Brightness",
+                name: "HAIGC 高亮：呼吸亮度",
+                defaultValue: 1,
+                type: () => {
+                    const id = "HAIGC-Highlight-Breathing-Brightness";
+                    const input = $el("input", {
+                        id,
+                        type: "number",
+                        min: 0,
+                        max: 2,
+                        step: 0.1,
+                        value: coerceNumber(brightnessSetting.value, 1),
+                        style: { 
+                            width: "80px",
+                            padding: "2px 6px",
+                            borderRadius: "4px",
+                            border: "1px solid var(--border-color, #333)",
+                            backgroundColor: "var(--comfy-input-bg, #222)",
+                            color: "var(--input-text, #ddd)"
+                        },
+                        oninput: (e) => {
+                            let val = coerceNumber(e.target.value, 1);
+                            if (val < 0) val = 0;
+                            if (val > 2) val = 2;
+                            breathingBrightness = val;
+                            app.graph?.setDirtyCanvas?.(true, true);
+                        },
+                        onchange: (e) => {
+                            let val = coerceNumber(e.target.value, 1);
+                            if (val < 0) val = 0;
+                            if (val > 2) val = 2;
+                            brightnessSetting.value = val;
+                            breathingBrightness = val;
+                        },
+                         onkeydown: (e) => {
+                            e.stopPropagation();
+                        }
+                    });
+                    return $el("tr", [
+                        $el("td", [$el("label", { for: id, textContent: "HAIGC 高亮：呼吸亮度:" })]),
+                        $el("td", [input]),
+                    ]);
+                },
+                onChange(value) {
+                    let val = coerceNumber(value, 1);
+                    if (val < 0) val = 0;
+                    if (val > 2) val = 2;
+                    breathingBrightness = val;
+                    app.graph?.setDirtyCanvas?.(true, true);
+                },
+            });
+            breathingBrightness = coerceNumber(brightnessSetting?.value, 1);
+
             const colorSettingId = "HAIGC.Highlight.Breathing.Color";
             const colorSetting = app.ui.settings.addSetting({
                 id: colorSettingId,
@@ -165,11 +318,6 @@ app.registerExtension({
                     const id = "HAIGC-Highlight-Breathing-Color";
                     
                     // --- Helper to update state ---
-                    const normalizeHex = (value, fallback) => {
-                        if (typeof value !== "string") return fallback;
-                        const v = value.trim();
-                        return /^#([0-9a-fA-F]{6})$/.test(v) ? v : fallback;
-                    };
                     const parseColors = (val) => {
                         const parts = (typeof val === "string" ? val : "")
                             .split(",")
@@ -329,6 +477,179 @@ app.registerExtension({
             });
             // Initialize from saved setting or default
             breathingColor = colorSetting?.value || breathingColor;
+
+            const timeEnabledSetting = app.ui.settings.addSetting({
+                id: "HAIGC.Highlight.Time.Enabled",
+                name: "HAIGC 高亮：时间显示",
+                type: "boolean",
+                defaultValue: true,
+                onChange(value) {
+                    timeEnabled = coerceBool(value, true);
+                    app.graph?.setDirtyCanvas?.(true, true);
+                },
+            });
+            timeEnabled = coerceBool(timeEnabledSetting?.value, true);
+
+            const timeColorSettingId = "HAIGC.Highlight.Time.Color";
+            const timeColorSetting = app.ui.settings.addSetting({
+                id: timeColorSettingId,
+                name: "HAIGC 高亮：时间颜色",
+                defaultValue: "#22FF22",
+                type: () => {
+                    const id = "HAIGC-Highlight-Time-Color";
+                    let textInput;
+                    let colorInput;
+                    const updateTimeColor = (val, save) => {
+                        const nextColor = normalizeHex(val, timeColor || "#22FF22");
+                        timeColor = nextColor;
+                        if (textInput) textInput.value = nextColor;
+                        if (colorInput) colorInput.value = nextColor;
+                        app.graph?.setDirtyCanvas?.(true, true);
+                        if (save) {
+                            timeColorSetting.value = nextColor;
+                            app.ui?.settings?.setSettingValue?.(timeColorSettingId, nextColor);
+                        }
+                    };
+                    const current = normalizeHex(timeColorSetting?.value || timeColor || "#22FF22", "#22FF22");
+                    textInput = $el("input", {
+                        id,
+                        type: "text",
+                        value: current,
+                        placeholder: "#22FF22",
+                        style: { 
+                            width: "100%",
+                            padding: "4px",
+                            borderRadius: "4px",
+                            border: "1px solid var(--border-color, #333)",
+                            backgroundColor: "var(--comfy-input-bg, #222)",
+                            color: "var(--input-text, #ddd)",
+                            fontFamily: "monospace"
+                        },
+                        oninput: (e) => updateTimeColor(e.target.value, false),
+                        onchange: (e) => updateTimeColor(e.target.value, true),
+                        onkeydown: (e) => e.stopPropagation()
+                    });
+                    colorInput = $el("input", {
+                        type: "color",
+                        value: current,
+                        style: { 
+                            width: "24px",
+                            height: "24px",
+                            padding: 0,
+                            border: "1px solid #666",
+                            cursor: "pointer",
+                            backgroundColor: "transparent",
+                            borderRadius: "4px"
+                        },
+                        oninput: (e) => updateTimeColor(e.target.value, false),
+                        onchange: (e) => updateTimeColor(e.target.value, true)
+                    });
+                    return $el("tr", [
+                        $el("td", [$el("label", { for: id, textContent: "HAIGC 高亮：时间颜色:" })]),
+                        $el("td", [
+                            $el("div", { style: { display: "flex", alignItems: "center", gap: "8px" } }, [
+                                colorInput,
+                                textInput
+                            ])
+                        ]),
+                    ]);
+                },
+                onChange(value) {
+                    timeColor = normalizeHex(value, timeColor || "#22FF22");
+                    app.graph?.setDirtyCanvas?.(true, true);
+                },
+            });
+            timeColor = normalizeHex(timeColorSetting?.value || timeColor || "#22FF22", "#22FF22");
+
+            const timeBgOpacitySetting = app.ui.settings.addSetting({
+                id: "HAIGC.Highlight.Time.BgOpacity",
+                name: "HAIGC 高亮：时间背景透明度",
+                defaultValue: 0.55,
+                type: () => {
+                    const id = "HAIGC-Highlight-Time-BgOpacity";
+                    const input = $el("input", {
+                        id,
+                        type: "number",
+                        min: 0,
+                        max: 1,
+                        step: 0.05,
+                        value: clamp01(timeBgOpacitySetting.value, 0.55).toFixed(2),
+                        style: { 
+                            width: "80px",
+                            padding: "2px 6px",
+                            borderRadius: "4px",
+                            border: "1px solid var(--border-color, #333)",
+                            backgroundColor: "var(--comfy-input-bg, #222)",
+                            color: "var(--input-text, #ddd)"
+                        },
+                        oninput: (e) => {
+                            timeBgOpacity = clamp01(e.target.value, 0.55);
+                            app.graph?.setDirtyCanvas?.(true, true);
+                        },
+                        onchange: (e) => {
+                            timeBgOpacity = clamp01(e.target.value, 0.55);
+                            timeBgOpacitySetting.value = timeBgOpacity;
+                        },
+                        onkeydown: (e) => {
+                            e.stopPropagation();
+                        }
+                    });
+                    return $el("tr", [
+                        $el("td", [$el("label", { for: id, textContent: "HAIGC 高亮：时间背景透明度:" })]),
+                        $el("td", [input]),
+                    ]);
+                },
+                onChange(value) {
+                    timeBgOpacity = clamp01(value, 0.55);
+                    app.graph?.setDirtyCanvas?.(true, true);
+                },
+            });
+            timeBgOpacity = clamp01(timeBgOpacitySetting?.value, 0.55);
+
+            const timeShadowOpacitySetting = app.ui.settings.addSetting({
+                id: "HAIGC.Highlight.Time.ShadowOpacity",
+                name: "HAIGC 高亮：时间阴影透明度",
+                defaultValue: 0.98,
+                type: () => {
+                    const id = "HAIGC-Highlight-Time-ShadowOpacity";
+                    const input = $el("input", {
+                        id,
+                        type: "number",
+                        min: 0,
+                        max: 1,
+                        step: 0.05,
+                        value: clamp01(timeShadowOpacitySetting.value, 0.98).toFixed(2),
+                        style: { 
+                            width: "80px",
+                            padding: "2px 6px",
+                            borderRadius: "4px",
+                            border: "1px solid var(--border-color, #333)",
+                            backgroundColor: "var(--comfy-input-bg, #222)",
+                            color: "var(--input-text, #ddd)"
+                        },
+                        oninput: (e) => {
+                            timeShadowOpacity = clamp01(e.target.value, 0.98);
+                            app.graph?.setDirtyCanvas?.(true, true);
+                        },
+                        onchange: (e) => {
+                            timeShadowOpacity = clamp01(e.target.value, 0.98);
+                            timeShadowOpacitySetting.value = timeShadowOpacity;
+                        },
+                        onkeydown: (e) => {
+                            e.stopPropagation();
+                        }
+                    });
+                    return $el("tr", [
+                        $el("td", [$el("label", { for: id, textContent: "HAIGC 高亮：时间阴影透明度:" })]),
+                        $el("td", [input]),
+                    ]);
+                },
+                onChange(value) {
+                    timeShadowOpacity = clamp01(value, 0.98);
+                    app.graph?.setDirtyCanvas?.(true, true);
+                },
+            });
+            timeShadowOpacity = clamp01(timeShadowOpacitySetting?.value, 0.98);
         }
 
         const original_drawNode = LGraphCanvas.prototype.drawNode;
@@ -336,7 +657,14 @@ app.registerExtension({
         LGraphCanvas.prototype.drawNode = function(node, ctx) {
             original_drawNode.call(this, node, ctx);
 
-            const isRunning = app.runningNodeId && app.runningNodeId.toString() === node.id.toString();
+            const currentRunningId = app.runningNodeId || runningNodeId;
+            if (currentRunningId && currentRunningId.toString() !== lastRunningNodeId) {
+                lastRunningNodeId = currentRunningId.toString();
+                runningStartTime = performance.now();
+            }
+            const isRunning = (
+                (currentRunningId && currentRunningId.toString() === node.id.toString())
+            );
             if (!isRunning) return;
             if (!highlightEnabled) return;
 
@@ -354,54 +682,45 @@ app.registerExtension({
                 // top_pad: extra top padding
                 const createPath = (pad, top_pad) => {
                     ctx.beginPath();
-                    // Safety check for node size
-                    const width = (node.size && node.size[0]) || 140;
-                    const height = (node.size && node.size[1]) || 60;
-                    const padOuter = pad + outer_expand;
-
-                    if (node.flags && node.flags.collapsed) {
-                        const collapsedWidth = node._collapsed_width || LiteGraph.NODE_COLLAPSED_WIDTH || 140;
-                        const titleHeight = LiteGraph.NODE_TITLE_HEIGHT || 30;
-                        const x = -padOuter + side_inset;
-                        const y = -padOuter - 1 - top_pad + top_inset;
-                        const w = collapsedWidth + padOuter * 2 - side_inset * 2;
-                        const h = titleHeight + padOuter * 2 + top_pad - bottom_inset - top_inset;
+                    const isCollapsed = !!(node.flags && node.flags.collapsed) || !!node.collapsed;
+                    const titleHeight = LiteGraph.NODE_TITLE_HEIGHT || 30;
+                    const width = isCollapsed
+                        ? (node._collapsed_width || LiteGraph.NODE_COLLAPSED_WIDTH || (node.size && node.size[0]) || 140)
+                        : ((node.size && node.size[0]) || 140);
+                    const height = isCollapsed
+                        ? titleHeight
+                        : ((node.size && node.size[1]) || 60);
+                    const bounds = isCollapsed
+                        ? { x: 0, y: -titleHeight, w: width, h: titleHeight }
+                        : { x: 0, y: -titleHeight, w: width, h: height + titleHeight };
+                    const padOuter = pad;
+                    if (shape === LiteGraph.CIRCLE_SHAPE) {
+                        const radius = Math.max(2, Math.max(bounds.w, bounds.h) * 0.5 + padOuter);
+                        ctx.arc(bounds.x + bounds.w * 0.5, bounds.y + bounds.h * 0.5, radius, 0, Math.PI * 2);
+                    } else {
+                        const x = bounds.x - padOuter;
+                        const y = bounds.y - padOuter;
+                        const w = bounds.w + padOuter * 2;
+                        const h = bounds.h + padOuter * 2;
                         if (ctx.roundRect) {
                             ctx.roundRect(x, y, w, h, 12);
                         } else {
                             ctx.rect(x, y, w, h);
                         }
-                    } else {
-                        if (shape === LiteGraph.BOX_SHAPE || shape === LiteGraph.ROUND_SHAPE || shape === LiteGraph.CARD_SHAPE) {
-                            const x = -padOuter + side_inset;
-                            const y = -padOuter - 1 - top_pad + top_inset;
-                            const w = width + padOuter * 2 - side_inset * 2;
-                            const h = height + padOuter * 2 + top_pad - bottom_inset - top_inset;
-                            if (ctx.roundRect) {
-                                ctx.roundRect(x, y, w, h, 12);
-                            } else {
-                                ctx.rect(x, y, w, h);
-                            }
-                        } else if (shape === LiteGraph.CIRCLE_SHAPE) {
-                            const radius = Math.max(2, width * 0.5 + padOuter - side_inset);
-                            ctx.arc(width * 0.5, height * 0.5, radius, 0, Math.PI * 2);
-                        }
                     }
                 };
 
-                const official_pad = 10;
-                const outer_expand = 5;
-                const side_inset = 10;
-                const bottom_inset = 10;
-                const top_inset = 3;
+                const official_pad = 0;
                 const cover_width = 4;
                 const ambient_width = 10;
                 const main_width = 6;
                 const core_width = 2;
-                const top_padding_adjustment = 15;
+                const top_padding_adjustment = 0;
+                const side_inset = 0;
+                const outer_expand = 0;
 
                 const cover_pad = official_pad;
-                const glow_pad = official_pad + cover_width / 2 + main_width / 2;
+                const glow_pad = cover_pad;
 
                 // Animation pulse
                 const now = performance.now();
@@ -410,8 +729,20 @@ app.registerExtension({
                     const period = Math.max(50, breathingPeriodMs);
                     const strength = Math.min(100, Math.max(0, breathingStrength)) / 100;
                     const minAlpha = 1 - strength * 0.5;
-                    const pulse = (Math.sin((now / period) * Math.PI * 2) + 1) / 2;
-                    breathAlpha = minAlpha + pulse * (1 - minAlpha);
+                    if (autoBreathingEnabled) {
+                        const pulse = (Math.sin((now / period) * Math.PI * 2) + 1) / 2;
+                        breathAlpha = minAlpha + pulse * (1 - minAlpha);
+                    } else if (lastMouseMoveTime) {
+                        const recentMouse = now - lastMouseMoveTime < 80;
+                        if (recentMouse) {
+                            const mousePeriod = Math.max(50, mouseBreathPeriodMs || period);
+                            const elapsed = now - (mouseBreathPhaseStart || now);
+                            const pulse = (Math.sin((elapsed / mousePeriod) * Math.PI * 2) + 1) / 2;
+                            breathAlpha = minAlpha + pulse * (1 - minAlpha);
+                        } else {
+                            breathAlpha = 1.0;
+                        }
+                    }
                 }
 
                 // Parse Colors
@@ -444,16 +775,21 @@ app.registerExtension({
                     shadowColor = strokeStyle;
                 }
 
+                const sizeScale = Math.max(0.2, breathingSizeScale || 1);
+                const brightness = Math.max(0, breathingBrightness || 1);
+                const brightnessAlpha = Math.min(1, brightness);
+                const brightnessBlur = Math.max(0.2, brightness);
+
                 // Layer 1: Cover official highlight (no dark mask)
                 ctx.save();
                 try {
                     ctx.lineJoin = "round";
                     ctx.lineCap = "round";
                     createPath(cover_pad, top_padding_adjustment);
-                    ctx.lineWidth = cover_width * r;
+                    ctx.lineWidth = cover_width * r * sizeScale;
                     ctx.strokeStyle = strokeStyle;
                     ctx.shadowBlur = 0;
-                    ctx.globalAlpha = 0.95;
+                    ctx.globalAlpha = 0.95 * brightnessAlpha;
                     ctx.stroke();
                 } finally {
                     ctx.restore();
@@ -465,11 +801,11 @@ app.registerExtension({
                     ctx.lineJoin = "round";
                     ctx.lineCap = "round";
                     createPath(glow_pad, top_padding_adjustment);
-                    ctx.lineWidth = ambient_width * r;
+                    ctx.lineWidth = ambient_width * r * sizeScale;
                     ctx.strokeStyle = shadowColor; 
                     ctx.shadowColor = shadowColor;
-                    ctx.shadowBlur = 40 * r;
-                    ctx.globalAlpha = 0.35 * breathAlpha;
+                    ctx.shadowBlur = 40 * r * sizeScale * brightnessBlur;
+                    ctx.globalAlpha = 0.35 * breathAlpha * brightnessAlpha;
                     ctx.stroke();
                 } finally {
                     ctx.restore();
@@ -481,11 +817,11 @@ app.registerExtension({
                     ctx.lineJoin = "round";
                     ctx.lineCap = "round";
                     createPath(glow_pad, top_padding_adjustment);
-                    ctx.lineWidth = main_width * r;
+                    ctx.lineWidth = main_width * r * sizeScale;
                     ctx.strokeStyle = strokeStyle;
                     ctx.shadowColor = shadowColor;
-                    ctx.shadowBlur = 18 * r;
-                    ctx.globalAlpha = 0.85 * breathAlpha;
+                    ctx.shadowBlur = 18 * r * sizeScale * brightnessBlur;
+                    ctx.globalAlpha = 0.85 * breathAlpha * brightnessAlpha;
                     ctx.stroke();
                 } finally {
                     ctx.restore();
@@ -497,14 +833,81 @@ app.registerExtension({
                     ctx.lineJoin = "round";
                     ctx.lineCap = "round";
                     createPath(glow_pad, top_padding_adjustment);
-                    ctx.lineWidth = core_width * r;
+                    ctx.lineWidth = core_width * r * sizeScale;
                     ctx.strokeStyle = "#FFFFFF"; // White core
-                    ctx.shadowBlur = 5 * r;
+                    ctx.shadowBlur = 5 * r * sizeScale * brightnessBlur;
                     ctx.shadowColor = "#FFFFFF";
-                    ctx.globalAlpha = 1.0;
+                    ctx.globalAlpha = 1.0 * brightnessAlpha;
                     ctx.stroke();
                 } finally {
                     ctx.restore();
+                }
+                if (timeEnabled) {
+                    const nowMs = performance.now();
+                    if (!runningStartTime) runningStartTime = nowMs;
+                    const elapsedText = formatElapsed(nowMs - runningStartTime);
+                    ctx.save();
+                    try {
+                        const fontSize = Math.max(11, 12 * r);
+                        ctx.font = `bold ${fontSize}px monospace`;
+                        ctx.textAlign = "left";
+                        ctx.textBaseline = "bottom";
+                        const isCollapsed = !!(node.flags && node.flags.collapsed) || !!node.collapsed;
+                        const titleHeight = LiteGraph.NODE_TITLE_HEIGHT || 30;
+                        const width = isCollapsed
+                            ? (node._collapsed_width || LiteGraph.NODE_COLLAPSED_WIDTH || (node.size && node.size[0]) || 140)
+                            : ((node.size && node.size[0]) || 140);
+                        const height = isCollapsed
+                            ? titleHeight
+                            : ((node.size && node.size[1]) || 60);
+                        const bounds = isCollapsed
+                            ? { x: 0, y: -titleHeight, w: width, h: titleHeight }
+                            : { x: 0, y: -titleHeight, w: width, h: height + titleHeight };
+                        const outsideOffset = ambient_width * r * sizeScale * 0.5 + 6 * r;
+                        const textX = bounds.x + 6 * r;
+                        const textY = bounds.y - outsideOffset;
+                        const textWidth = ctx.measureText(elapsedText).width;
+                        const paddingX = 4 * r;
+                        const paddingY = 2 * r;
+                        const bgHeight = fontSize + paddingY * 2;
+                        const bgWidth = textWidth + paddingX * 2;
+                        const bgX = textX - paddingX;
+                        const bgY = textY - bgHeight + 2 * r;
+                        ctx.save();
+                        ctx.fillStyle = `rgba(0, 0, 0, ${clamp01(timeBgOpacity, 0.55)})`;
+                        ctx.shadowColor = "rgba(0, 0, 0, 0.7)";
+                        ctx.shadowBlur = 8 * r;
+                        ctx.shadowOffsetX = 0;
+                        ctx.shadowOffsetY = 1 * r;
+                        if (ctx.roundRect) {
+                            ctx.beginPath();
+                            ctx.roundRect(bgX, bgY, bgWidth, bgHeight, bgHeight / 2);
+                            ctx.fill();
+                        } else {
+                            const radius = bgHeight / 2;
+                            const right = bgX + bgWidth;
+                            const bottom = bgY + bgHeight;
+                            ctx.beginPath();
+                            ctx.moveTo(bgX + radius, bgY);
+                            ctx.lineTo(right - radius, bgY);
+                            ctx.arc(right - radius, bgY + radius, radius, -Math.PI / 2, Math.PI / 2);
+                            ctx.lineTo(bgX + radius, bottom);
+                            ctx.arc(bgX + radius, bgY + radius, radius, Math.PI / 2, (Math.PI * 3) / 2);
+                            ctx.closePath();
+                            ctx.fill();
+                        }
+                        ctx.restore();
+                        ctx.fillStyle = normalizeHex(timeColor, "#22FF22");
+                        ctx.shadowColor = `rgba(0, 0, 0, ${clamp01(timeShadowOpacity, 0.98)})`;
+                        ctx.shadowBlur = 10 * r;
+                        ctx.shadowOffsetX = 0;
+                        ctx.shadowOffsetY = 2 * r;
+                        ctx.textAlign = "left";
+                        ctx.textBaseline = "bottom";
+                        ctx.fillText(elapsedText, textX, textY);
+                    } finally {
+                        ctx.restore();
+                    }
                 }
 
             } catch (e) {
@@ -519,9 +922,70 @@ app.registerExtension({
         
         // Listen to the executing event to force canvas dirty
         api.addEventListener("executing", (e) => {
+             try {
+                 const detail = e?.detail || {};
+                 const explicitId = detail.node_id || detail.nodeId || (detail.node && detail.node.id);
+                 if (explicitId !== undefined && explicitId !== null) {
+                     runningNodeId = explicitId.toString();
+                     runningStartTime = performance.now();
+                     lastRunningNodeId = runningNodeId;
+                 } else {
+                     runningNodeId = null;
+                     lastRunningNodeId = null;
+                     runningStartTime = 0;
+                 }
+             } catch(_) {
+                 runningNodeId = null;
+                 lastRunningNodeId = null;
+                 runningStartTime = 0;
+             }
              if (app.canvas) {
                  app.canvas.setDirty(true, true);
              }
+             scheduleTick(0);
         });
+        const ensureMouseListener = () => {
+            if (mouseListenerAttached) return;
+            const canvasEl = app.canvas?.canvas || app.canvas?.el || app.canvas?.canvasEl;
+            if (!canvasEl || !canvasEl.addEventListener) return;
+            canvasEl.addEventListener("mousemove", () => {
+                const now = performance.now();
+                if (lastMouseMoveTime) {
+                    const interval = now - lastMouseMoveTime;
+                    const newPeriod = Math.min(3000, Math.max(200, interval));
+                    if (mouseBreathPeriodMs && mouseBreathPhaseStart) {
+                        const elapsed = now - mouseBreathPhaseStart;
+                        const phase = ((elapsed / mouseBreathPeriodMs) * Math.PI * 2) % (Math.PI * 2);
+                        mouseBreathPhaseStart = now - (phase / (Math.PI * 2)) * newPeriod;
+                    } else {
+                        mouseBreathPhaseStart = now;
+                    }
+                    mouseBreathPeriodMs = newPeriod;
+                } else {
+                    mouseBreathPhaseStart = now;
+                }
+                lastMouseMoveTime = now;
+                scheduleTick(0);
+            });
+            mouseListenerAttached = true;
+        };
+        const scheduleTick = (delay) => {
+            if (tickHandle !== null) return;
+            tickHandle = setTimeout(() => {
+                tickHandle = null;
+                ensureMouseListener();
+                const now = performance.now();
+                const hasRunning = app.canvas && (app.runningNodeId || runningNodeId) && highlightEnabled;
+                if (hasRunning) {
+                    app.canvas.setDirty(true, true);
+                }
+                if (!hasRunning) return;
+                const recentMouse = now - lastMouseMoveTime < 80;
+                const activeBreathing = breathingEnabled && (autoBreathingEnabled || recentMouse);
+                const nextDelay = activeBreathing ? 33 : 200;
+                scheduleTick(nextDelay);
+            }, Math.max(0, delay));
+        };
+        scheduleTick(0);
 	}
 });
