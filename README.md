@@ -1,5 +1,7 @@
 # ComfyUI HAIGC Highlight Extension
 
+[English](#english)
+
 ## 简介
 本扩展用于在 ComfyUI 中突出显示当前正在运行的节点，提供更醒目的高亮边框与呼吸灯效果，适合节点较多的工作流快速定位执行位置。
 
@@ -57,6 +59,8 @@ ComfyUI/
 
 <details>
 <summary><strong>English (Click to Expand)</strong></summary>
+
+<a id="english"></a>
 
 ## Overview
 This extension highlights the currently running node in ComfyUI with a strong neon outline and breathing effect, making it easier to locate execution points in large graphs.
