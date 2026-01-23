@@ -1,6 +1,6 @@
 # ComfyUI HAIGC Highlight Extension
 
-[展开界面](#english)
+[English](#english)
 
 ## 简介
 本扩展用于在 ComfyUI 中突出显示当前正在运行的节点，提供更醒目的高亮边框与呼吸灯效果，适合节点较多的工作流快速定位执行位置。
@@ -58,7 +58,7 @@ ComfyUI/
 ---
 
 <details>
-<summary><strong>展开界面</strong></summary>
+<summary><strong>English</strong></summary>
 
 <a id="english"></a>
 
