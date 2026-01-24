@@ -79,7 +79,7 @@ This extension highlights the currently running node in ComfyUI with a strong ne
 - **Status Feedback**:
   - 🟢 **Running**: Custom colored breathing light (Default: #fafafa).
   - 🟣 **Error**: Purple breathing light (#9932CC) for failed nodes.
-  - 🔴 **Missing Input**: Red highlight for nodes with missing required inputs.
+  - � **Missing Input**: Pale Purple highlight for nodes with missing required inputs.
 - **Firefly Breathing**: Natural breathing animation algorithm mimicking firefly light patterns.
 - **Performance Mode**: Optimized for low power consumption with minimal resource usage.
 - **Customization**: Fully configurable colors (solid/gradient), breathing speed, size, and brightness.
