@@ -11,7 +11,7 @@
 - **状态反馈**：
   - 🟢 **运行中**：自定义颜色的呼吸灯（默认白色 #fafafa）。
   - 🟣 **报错**：节点运行失败时显示紫色呼吸灯框（#9932CC），快速定位错误。
-  - 🔴 **缺少输入**：检测到必要输入未连接时显示红色提示。
+  - � **缺少输入**：检测到必要输入未连接时显示淡紫色提示（#E0B0FF）。
 - **萤火虫呼吸**：采用拟合萤火虫发光的呼吸算法，光效更自然。
 - **性能模式**：深度优化的低功耗模式，极低资源占用（静止时近乎零消耗）。
 - **个性化设置**：支持自定义颜色（单色/渐变）、呼吸频率、大小、亮度等。
@@ -53,6 +53,8 @@ ComfyUI/
 
 - **呼吸灯不亮**  
   默认情况下“自动呼吸”和“鼠标触发”均为关闭状态，只有在节点运行时才会亮起。如需常亮请在设置中开启“自动呼吸”。
+- **报错紫框不消失**  
+  运行成功后紫色错误框会自动清除，如仍残留请刷新页面或重启 ComfyUI。
 
 ## 作者
 - 作者：HAIGC  
@@ -79,7 +81,7 @@ This extension highlights the currently running node in ComfyUI with a strong ne
 - **Status Feedback**:
   - 🟢 **Running**: Custom colored breathing light (Default: #fafafa).
   - 🟣 **Error**: Purple breathing light (#9932CC) for failed nodes.
-  - � **Missing Input**: Pale Purple highlight for nodes with missing required inputs.
+  - 🟣 **Missing Input**: Pale Purple highlight for nodes with missing required inputs (#E0B0FF).
 - **Firefly Breathing**: Natural breathing animation algorithm mimicking firefly light patterns.
 - **Performance Mode**: Optimized for low power consumption with minimal resource usage.
 - **Customization**: Fully configurable colors (solid/gradient), breathing speed, size, and brightness.
