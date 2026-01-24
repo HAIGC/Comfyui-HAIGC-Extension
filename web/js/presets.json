@@ -30,7 +30,7 @@
         }
     ],
     "styles": {
-        "missing_input": {"color": "#FF0000", "enabled": true},
+        "missing_input": {"color": "#E0B0FF", "enabled": true},
         "error": {"color": "#9932CC", "enabled": true}
     },
     "defaults": {

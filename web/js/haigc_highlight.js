@@ -65,7 +65,7 @@ app.registerExtension({
         let lastMouseMoveHandleTime = 0;
         
         // New State Variables
-        let missingInputColor = "#FF0000";
+        let missingInputColor = "#E0B0FF";
         let errorColor = "#9932CC";
         let loadedPresets = [];
         let lastErrorNodeId = null;
