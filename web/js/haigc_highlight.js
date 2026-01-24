@@ -1063,9 +1063,7 @@ app.registerExtension({
                  const explicitId = detail.node_id || detail.nodeId || (detail.node && detail.node.id);
                  if (explicitId !== undefined && explicitId !== null) {
                      runningNodeId = explicitId.toString();
-                     if (lastErrorNodeId === runningNodeId) {
-                         lastErrorNodeId = null;
-                     }
+                     lastErrorNodeId = null;
                      runningStartTime = performance.now();
                      lastRunningNodeId = runningNodeId;
                  } else {
@@ -1082,6 +1080,27 @@ app.registerExtension({
                  app.canvas.setDirty(true, true);
              }
              scheduleTick(0);
+        });
+
+        api.addEventListener("executed", (e) => {
+            try {
+                const detail = e?.detail || {};
+                const explicitId = detail.node_id || detail.nodeId || (detail.node && detail.node.id);
+                if (explicitId !== undefined && explicitId !== null) {
+                    const idStr = explicitId.toString();
+                    if (lastErrorNodeId === idStr) {
+                        lastErrorNodeId = null;
+                    }
+                    if (app.lastNodeErrors && app.lastNodeErrors[explicitId]) {
+                        delete app.lastNodeErrors[explicitId];
+                    }
+                    if (app.canvas) {
+                        app.canvas.setDirty(true, true);
+                    }
+                }
+            } catch (err) {
+                console.error("Error handling executed in HAIGC Highlight:", err);
+            }
         });
 
         // Listen for execution errors to highlight the failed node immediately
