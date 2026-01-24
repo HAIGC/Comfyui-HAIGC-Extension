@@ -1,0 +1,50 @@
+{
+    "presets": [
+        {
+            "name": "默认绿",
+            "colors": ["#22FF22"]
+        },
+        {
+            "name": "红",
+            "colors": ["#FF0000"]
+        },
+        {
+            "name": "蓝",
+            "colors": ["#0088FF"]
+        },
+        {
+            "name": "火",
+            "colors": ["#FF0000", "#FFFF00"]
+        },
+        {
+            "name": "赛博",
+            "colors": ["#00FFFF", "#FF00FF"]
+        },
+        {
+            "name": "海洋",
+            "colors": ["#0000FF", "#00FFFF"]
+        },
+        {
+            "name": "彩虹",
+            "colors": ["#FF0000", "#FFFF00", "#00FF00", "#00FFFF", "#0000FF", "#FF00FF"]
+        }
+    ],
+    "styles": {
+        "missing_input": {"color": "#FF0000", "enabled": true},
+        "error": {"color": "#9932CC", "enabled": true}
+    },
+    "defaults": {
+        "highlight_enabled": true,
+        "breathing_enabled": false,
+        "auto_breathing": false,
+        "breathing_period_ms": 500,
+        "breathing_strength": 100,
+        "breathing_size_scale": 2.0,
+        "breathing_brightness": 2.0,
+        "breathing_color": "#fafafa",
+        "time_enabled": true,
+        "time_color": "#ff4d00",
+        "time_bg_opacity": 1.00,
+        "time_shadow_opacity": 0.50
+    }
+}
