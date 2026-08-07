@@ -68,9 +68,65 @@ app.registerExtension({
         let missingInputColor = "#E0B0FF";
         let errorColor = "#9932CC";
         let loadedPresets = [];
-        let lastErrorNodeId = null;
+        let errorNodeIds = new Set();
         
         let highlightSetting, enabledSetting, autoBreathingSetting, periodSetting, strengthSetting, sizeSetting, brightnessSetting, colorSetting, timeEnabledSetting, timeColorSetting, timeBgOpacitySetting, timeShadowOpacitySetting;
+
+        const getNodeErrorEntry = (nodeId) => {
+            if (!app.lastNodeErrors || nodeId === undefined || nodeId === null) return null;
+            return app.lastNodeErrors[nodeId] ?? app.lastNodeErrors[nodeId.toString()] ?? null;
+        };
+
+        const clearNodeErrorEntry = (nodeId) => {
+            if (!app.lastNodeErrors || nodeId === undefined || nodeId === null) return;
+            delete app.lastNodeErrors[nodeId];
+            delete app.lastNodeErrors[nodeId.toString()];
+        };
+
+        const markNodeError = (nodeId) => {
+            if (nodeId === undefined || nodeId === null) return;
+            errorNodeIds.add(nodeId.toString());
+        };
+
+        const hasNodeError = (nodeId) => {
+            if (nodeId === undefined || nodeId === null) return false;
+            const idStr = nodeId.toString();
+            return errorNodeIds.has(idStr) || !!getNodeErrorEntry(nodeId);
+        };
+
+        const clearTrackedNodeError = (nodeId) => {
+            if (nodeId === undefined || nodeId === null) return;
+            errorNodeIds.delete(nodeId.toString());
+            clearNodeErrorEntry(nodeId);
+        };
+
+        const clearAllTrackedErrors = () => {
+            errorNodeIds.clear();
+            if (app.lastNodeErrors) {
+                for (const key of Object.keys(app.lastNodeErrors)) {
+                    delete app.lastNodeErrors[key];
+                }
+            }
+        };
+
+        const resetExecutionState = ({ clearErrors = false } = {}) => {
+            runningNodeId = null;
+            lastRunningNodeId = null;
+            runningStartTime = 0;
+            if (clearErrors) {
+                clearAllTrackedErrors();
+            }
+        };
+
+        const getEventNodeId = (detail) => {
+            if (!detail) return null;
+            return detail.display_node
+                ?? detail.displayNode
+                ?? detail.node_id
+                ?? detail.nodeId
+                ?? (typeof detail.node === "object" ? detail.node?.id : detail.node)
+                ?? null;
+        };
 
         const applyDefaults = (defaults) => {
             if (!defaults) return;
@@ -736,10 +792,7 @@ app.registerExtension({
             let isMissingInput = false;
 
             // Error Check
-            if (node.bgcolor === "#FF0000" || node.bgcolor === "red" || 
-                (app.lastNodeErrors && app.lastNodeErrors[node.id]) ||
-                (lastErrorNodeId && lastErrorNodeId === node.id.toString())
-            ) {
+            if (hasNodeError(node.id)) {
                 isError = true;
                 targetColor = errorColor;
             }
@@ -1060,21 +1113,17 @@ app.registerExtension({
         api.addEventListener("executing", (e) => {
              try {
                  const detail = e?.detail || {};
-                 const explicitId = detail.node_id || detail.nodeId || (detail.node && detail.node.id);
+                 const explicitId = getEventNodeId(detail);
                  if (explicitId !== undefined && explicitId !== null) {
                      runningNodeId = explicitId.toString();
-                     lastErrorNodeId = null;
+                     clearTrackedNodeError(explicitId);
                      runningStartTime = performance.now();
                      lastRunningNodeId = runningNodeId;
                  } else {
-                     runningNodeId = null;
-                     lastRunningNodeId = null;
-                     runningStartTime = 0;
+                     resetExecutionState();
                  }
              } catch(_) {
-                 runningNodeId = null;
-                 lastRunningNodeId = null;
-                 runningStartTime = 0;
+                 resetExecutionState();
              }
              if (app.canvas) {
                  app.canvas.setDirty(true, true);
@@ -1085,15 +1134,9 @@ app.registerExtension({
         api.addEventListener("executed", (e) => {
             try {
                 const detail = e?.detail || {};
-                const explicitId = detail.node_id || detail.nodeId || (detail.node && detail.node.id);
+                const explicitId = getEventNodeId(detail);
                 if (explicitId !== undefined && explicitId !== null) {
-                    const idStr = explicitId.toString();
-                    if (lastErrorNodeId === idStr) {
-                        lastErrorNodeId = null;
-                    }
-                    if (app.lastNodeErrors && app.lastNodeErrors[explicitId]) {
-                        delete app.lastNodeErrors[explicitId];
-                    }
+                    clearTrackedNodeError(explicitId);
                     if (app.canvas) {
                         app.canvas.setDirty(true, true);
                     }
@@ -1103,13 +1146,65 @@ app.registerExtension({
             }
         });
 
+        api.addEventListener("execution_start", () => {
+            try {
+                resetExecutionState({ clearErrors: true });
+                if (app.canvas) {
+                    app.canvas.setDirty(true, true);
+                }
+                scheduleTick(0);
+            } catch (err) {
+                console.error("Error handling execution_start in HAIGC Highlight:", err);
+            }
+        });
+
+        api.addEventListener("execution_cached", (e) => {
+            try {
+                const detail = e?.detail || {};
+                const nodes = Array.isArray(detail.nodes) ? detail.nodes : [];
+                for (const nodeId of nodes) {
+                    clearTrackedNodeError(nodeId);
+                }
+                if (nodes.length && app.canvas) {
+                    app.canvas.setDirty(true, true);
+                }
+            } catch (err) {
+                console.error("Error handling execution_cached in HAIGC Highlight:", err);
+            }
+        });
+
+        api.addEventListener("execution_success", () => {
+            try {
+                resetExecutionState({ clearErrors: true });
+                if (app.canvas) {
+                    app.canvas.setDirty(true, true);
+                }
+            } catch (err) {
+                console.error("Error handling execution_success in HAIGC Highlight:", err);
+            }
+        });
+
+        api.addEventListener("execution_interrupted", () => {
+            try {
+                resetExecutionState();
+                if (app.canvas) {
+                    app.canvas.setDirty(true, true);
+                }
+            } catch (err) {
+                console.error("Error handling execution_interrupted in HAIGC Highlight:", err);
+            }
+        });
+
         // Listen for execution errors to highlight the failed node immediately
         api.addEventListener("execution_error", (e) => {
             try {
                 const detail = e?.detail || {};
-                const explicitId = detail.node_id || detail.nodeId;
+                const explicitId = getEventNodeId(detail);
                 if (explicitId !== undefined && explicitId !== null) {
-                    lastErrorNodeId = explicitId.toString();
+                    markNodeError(explicitId);
+                    runningNodeId = null;
+                    lastRunningNodeId = null;
+                    runningStartTime = 0;
                     if (app.canvas) {
                         app.canvas.setDirty(true, true);
                     }
