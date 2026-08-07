@@ -1,117 +1,393 @@
 # ComfyUI HAIGC Highlight Extension
 
-[English](#english)
+一个专注于 ComfyUI 节点执行可视化的前端扩展。
 
-## 简介
-本扩展用于在 ComfyUI 中突出显示当前正在运行的节点，提供更醒目的高亮边框、呼吸灯效果及运行时间显示，适合节点较多的工作流快速定位执行位置。
+它会在工作流运行时高亮当前节点，并额外提供错误提示、缺失输入提示、运行计时、呼吸光效和颜色预设，帮助你在复杂工作流里更快定位执行位置与异常节点。
 
-## 功能特性
-- **高亮优化**：覆盖官方运行高亮框，整体更醒目，支持柔和光晕效果。
-- **时间显示**：在节点左上角实时显示运行耗时（格式：00:00s）。
-- **状态反馈**：
-  - 🟢 **运行中**：自定义颜色的呼吸灯（默认白色 #fafafa）。
-  - 🟣 **报错**：节点运行失败时显示紫色呼吸灯框（#9932CC），快速定位错误。
-  - � **缺少输入**：检测到必要输入未连接时显示淡紫色提示（#E0B0FF）。
-- **萤火虫呼吸**：采用拟合萤火虫发光的呼吸算法，光效更自然。
-- **性能模式**：深度优化的低功耗模式，极低资源占用（静止时近乎零消耗）。
-- **个性化设置**：支持自定义颜色（单色/渐变）、呼吸频率、大小、亮度等。
+## 功能概览
 
-## 安装
-将本仓库放入 ComfyUI 的 `custom_nodes` 目录：
-```
+- 更醒目的节点高亮框，方便在大工作流中快速找到当前执行位置
+- 节点左上角实时显示运行耗时
+- 对不同状态给出不同高亮反馈：
+  - 运行中
+  - 执行报错
+  - 缺少必要输入
+  - 缺失节点类型
+- 支持单色和多色渐变高亮
+- 支持鼠标触发呼吸和自动呼吸两种动画模式
+- 支持通过 `presets.json` 自定义默认值、预设颜色与状态颜色
+- 低占用设计，静止时刷新频率较低，尽量减少无意义重绘
+
+## 适用场景
+
+- 工作流节点很多，默认高亮不够醒目
+- 需要快速看出当前执行到了哪个节点
+- 需要在调试时第一时间定位报错节点
+- 想更直观地发现哪些节点缺少必要输入
+- 想给 ComfyUI 增加更统一、更有辨识度的视觉反馈
+
+## 安装方法
+
+将仓库放到 ComfyUI 的 `custom_nodes` 目录下：
+
+```text
 ComfyUI/
 └── custom_nodes/
     └── Comfyui-HAIGC-Extension/
 ```
 
-## 使用方式
+目录放好后，启动或重启 ComfyUI 即可加载。
+
+本扩展是前端扩展，不提供自定义节点，不依赖额外 Python 包。
+
+## 扩展结构
+
+```text
+Comfyui-HAIGC-Extension/
+├── __init__.py
+├── README.md
+└── web/
+    └── js/
+        ├── haigc_highlight.js
+        └── presets.json
+```
+
+- `__init__.py`
+  负责声明前端资源目录。
+- `web/js/haigc_highlight.js`
+  扩展主逻辑，包含设置项注册、节点绘制、高亮动画、状态事件处理。
+- `web/js/presets.json`
+  配置默认参数、颜色预设、错误颜色和缺失输入颜色。
+
+## 使用方法
+
 1. 启动 ComfyUI。
-2. 打开 Settings（设置）。
-3. 在设置中找到 `HAIGC 高亮` 相关选项进行调整。
+2. 打开右上角 `Settings`。
+3. 搜索 `HAIGC 高亮`，即可看到本扩展的所有设置项。
+4. 调整参数后，节点高亮会立即生效。
 
-## 设置说明
-- **HAIGC 高亮：鼠标触发呼吸**  
-  开启后，当鼠标移动时会触发轻微的呼吸效果（默认关闭以节省资源）。
-  
-- **HAIGC 高亮：自动呼吸**  
-  开启后，高亮框会持续自动呼吸（默认关闭）。
+如果你修改了扩展源码或 `presets.json`，通常需要刷新页面或重启 ComfyUI 以重新加载前端脚本。
 
-- **HAIGC 高亮：呼吸周期 (s)**  
-  呼吸动画的快慢，单位为秒。
+## 状态说明
 
-- **HAIGC 高亮：呼吸大小/亮度**  
-  调节光晕的扩散范围和亮度倍率。
+### 1. 运行中
 
-- **HAIGC 高亮：颜色设置**  
-  - 单色：输入 `#fafafa`  
-  - 渐变：输入 `#FF0000,#0000FF`  
-  - 内置多种预设（赛博、火焰、彩虹等）供快速选择。
+当前正在执行的节点会显示高亮框，并可叠加呼吸光效。
+
+默认颜色：
+
+- `#fafafa`
+
+### 2. 执行报错
+
+节点执行失败时，会显示错误高亮框，帮助你快速定位失败节点。
+
+默认颜色：
+
+- `#9932CC`
+
+当前版本已经补齐错误状态清理逻辑：
+
+- 节点重新开始执行时会清理旧错误态
+- 节点成功执行后会清理对应错误态
+- 工作流整体成功结束后会清空残留错误态
+- 缓存命中的节点也会同步清理旧错误态
+
+也就是说，只要本次工作流已经正常跑通，就不应该继续显示错误红框。
+
+### 3. 缺少必要输入
+
+当节点存在未连接的必要输入时，会显示缺失输入提示框。
+
+默认颜色：
+
+- `#E0B0FF`
+
+这类提示和执行错误是两种不同状态：
+
+- 执行错误：节点已经运行，但运行失败
+- 缺少输入：节点还没法进入正常执行
+
+### 4. 缺失节点类型
+
+如果工作流中某个节点类型未注册或扩展缺失，扩展也会把它当作异常状态进行高亮提示，便于排查缺失插件。
+
+## 设置项详细说明
+
+以下设置项都在 ComfyUI 的设置面板中可见。
+
+### `HAIGC 高亮：高亮框`
+
+- 类型：布尔开关
+- 默认值：开启
+- 作用：控制整个高亮框绘制是否启用
+
+关闭后，本扩展的可视化边框效果将不再显示。
+
+### `HAIGC 高亮：鼠标触发呼吸`
+
+- 类型：布尔开关
+- 默认值：关闭
+- 作用：当鼠标在画布上移动时，为高亮节点增加轻微呼吸变化
+
+适合想保留动态感、又不想持续动画占用刷新的场景。
+
+### `HAIGC 高亮：自动呼吸`
+
+- 类型：布尔开关
+- 默认值：关闭
+- 作用：让高亮框持续进行呼吸动画
+
+如果你偏好更强的视觉提示，可以开启。
+
+### `HAIGC 高亮：呼吸周期 (s)`
+
+- 类型：数字
+- 默认值：`0.5`
+- 作用：控制一次呼吸动画的时间长度
+
+数值越小，变化越快；数值越大，变化越慢。
+
+### `HAIGC 高亮：呼吸强度`
+
+- 类型：数字
+- 默认值：`100`
+- 作用：控制呼吸时的强弱变化幅度
+
+适合微调动画存在感。
+
+### `HAIGC 高亮：呼吸大小`
+
+- 类型：数字
+- 默认值：`2.0`
+- 作用：控制高亮光晕向外扩散的范围
+
+值越大，外扩越明显。
+
+### `HAIGC 高亮：呼吸亮度`
+
+- 类型：数字
+- 默认值：`2.0`
+- 作用：控制高亮整体亮度和发光强度
+
+### `HAIGC 高亮：颜色设置`
+
+- 类型：颜色输入 / 预设选择
+- 默认值：`#fafafa`
+- 作用：设置运行中节点的高亮颜色
+
+支持两种输入方式：
+
+1. 单色
+
+```text
+#fafafa
+```
+
+2. 多色渐变
+
+```text
+#FF0000,#0000FF
+```
+
+注意事项：
+
+- 颜色必须是 `#RRGGBB` 格式
+- 多个颜色之间用英文逗号分隔
+- 不要带空格或中文逗号
+
+### `HAIGC 高亮：时间显示`
+
+- 类型：布尔开关
+- 默认值：开启
+- 作用：控制节点左上角耗时文本是否显示
+
+### `HAIGC 高亮：时间颜色`
+
+- 类型：颜色值
+- 默认值：`#ff4d00`
+- 作用：设置耗时文字颜色
+
+### `HAIGC 高亮：时间背景透明度`
+
+- 类型：数字
+- 默认值：`1.0`
+- 作用：控制耗时文本背景透明度
+
+### `HAIGC 高亮：时间阴影透明度`
+
+- 类型：数字
+- 默认值：`0.5`
+- 作用：控制耗时文字阴影透明度
+
+## 颜色预设
+
+扩展内置了几组常用预设，定义在 `web/js/presets.json` 中：
+
+- 默认绿
+- 红
+- 蓝
+- 火
+- 赛博
+- 海洋
+- 彩虹
+
+如果你想自定义预设，可以直接编辑 `presets.json`。
+
+当前默认配置如下：
+
+```json
+{
+  "defaults": {
+    "highlight_enabled": true,
+    "breathing_enabled": false,
+    "auto_breathing": false,
+    "breathing_period_ms": 500,
+    "breathing_strength": 100,
+    "breathing_size_scale": 2.0,
+    "breathing_brightness": 2.0,
+    "breathing_color": "#fafafa",
+    "time_enabled": true,
+    "time_color": "#ff4d00",
+    "time_bg_opacity": 1.0,
+    "time_shadow_opacity": 0.5
+  }
+}
+```
+
+状态颜色默认值：
+
+```json
+{
+  "styles": {
+    "missing_input": { "color": "#E0B0FF", "enabled": true },
+    "error": { "color": "#9932CC", "enabled": true }
+  }
+}
+```
+
+## 工作机制简述
+
+扩展会接管 LiteGraph 节点绘制过程，并根据当前状态决定是否给节点绘制额外边框和时间信息。
+
+它主要监听以下执行事件：
+
+- `executing`
+- `executed`
+- `execution_start`
+- `execution_cached`
+- `execution_success`
+- `execution_interrupted`
+- `execution_error`
+
+这些事件会共同决定：
+
+- 当前哪个节点在运行
+- 哪些节点是错误状态
+- 哪些错误状态应该在重新执行或执行成功后被清除
+
+这也是为什么当前版本能正确解决“节点已经修好、工作流已经跑通，但错误红框还残留”的问题。
 
 ## 常见问题
-- **颜色无法改变**  
-  请确认修改后刷新页面或重新启动 ComfyUI，确保扩展文件被重新加载。
 
-- **呼吸灯不亮**  
-  默认情况下“自动呼吸”和“鼠标触发”均为关闭状态，只有在节点运行时才会亮起。如需常亮请在设置中开启“自动呼吸”。
-- **报错紫框不消失**  
-  运行成功后紫色错误框会自动清除，如仍残留请刷新页面或重启 ComfyUI。
+### 1. 高亮没有显示
 
-## 作者
-- 作者：HAIGC  
+请先检查：
+
+- 设置中的 `HAIGC 高亮：高亮框` 是否已开启
+- 扩展目录是否放在 `custom_nodes/Comfyui-HAIGC-Extension`
+- ComfyUI 是否已经重启
+- 浏览器页面是否已经刷新
+
+### 2. 修改颜色后没有变化
+
+通常是前端资源还没有重新加载。
+
+请尝试：
+
+- 刷新 ComfyUI 页面
+- 重启 ComfyUI
+- 清浏览器缓存后再打开
+
+### 3. 错误框不消失
+
+当前版本已经处理了绝大多数残留错误框问题。
+
+如果仍然遇到，请优先确认：
+
+- 本次工作流是否真的执行成功
+- 是否只是“缺少输入”提示，而不是“执行错误”提示
+- 是否修改了前端脚本但没有刷新页面
+
+### 4. 缺少输入高亮一直存在
+
+这是正常现象。
+
+只要必要输入没有连接，这个提示就会一直显示。它不是执行错误，不会因为别的节点跑通而自动消失。
+
+### 5. 开启自动呼吸后感觉太亮
+
+可以调低以下参数：
+
+- `呼吸强度`
+- `呼吸大小`
+- `呼吸亮度`
+
+或者直接关闭 `自动呼吸`，只保留鼠标触发模式。
+
+## 自定义建议
+
+如果你偏好简洁风格，可以参考下面这组配置：
+
+- 高亮框：开启
+- 鼠标触发呼吸：关闭
+- 自动呼吸：关闭
+- 颜色设置：`#fafafa`
+- 时间显示：开启
+- 时间颜色：`#ff4d00`
+
+如果你偏好更强烈的视觉风格，可以这样设置：
+
+- 自动呼吸：开启
+- 呼吸周期：`0.5`
+- 呼吸强度：提高
+- 呼吸大小：提高
+- 颜色设置：使用 `赛博` 或 `彩虹`
+
+## 兼容性说明
+
+- 适用于标准 ComfyUI 前端环境
+- 通过前端扩展方式注入，不修改 ComfyUI 核心 Python 节点逻辑
+- 当 ComfyUI 前端事件结构发生变化时，可能需要同步更新事件解析逻辑
+
+## 最近更新
+
+### 错误红框残留修复
+
+已修复以下问题：
+
+- 节点报错后，即使修正错误重新运行，红框仍可能残留
+- 工作流整体已经成功完成，但旧错误框没有清掉
+- 缓存命中或节点重新执行时，旧错误状态没有同步清理
+
+修复后规则如下：
+
+- 节点重新进入执行时清理旧错误
+- 节点成功执行时清理旧错误
+- 缓存命中节点时清理旧错误
+- 整个工作流执行成功时统一清理所有残留错误状态
+
+## 作者信息
+
+- 作者：HAIGC
 - 微信：HAIGC1994
 
 ## 相关链接
+
 - 工作流体验地址：https://www.runninghub.cn/post/2014536001888198657/inviteCode=rh-v1127
 - 推荐 ComfyUI 云平台，通过这个地址注册送 1000 点算力：https://www.runninghub.cn/user-center/1887871050510716930/webapp?inviteCode=rh-v1127
-- 已注册还未绑定邀请码可绑定邀请码：rh-v1127 赠送 1000 点算力
+- 已注册但未绑定邀请码可使用：`rh-v1127`
 
----
+## License
 
-<details>
-<summary><strong>English</strong></summary>
-
-<a id="english"></a>
-
-## Overview
-This extension highlights the currently running node in ComfyUI with a strong neon outline, breathing effect, and execution timer, making it easier to locate execution points in large graphs.
-
-## Features
-- **Enhanced Highlight**: Stronger and softer neon outline than the official one.
-- **Timer Display**: Real-time execution timer displayed at the top-left of the node.
-- **Status Feedback**:
-  - 🟢 **Running**: Custom colored breathing light (Default: #fafafa).
-  - 🟣 **Error**: Purple breathing light (#9932CC) for failed nodes.
-  - 🟣 **Missing Input**: Pale Purple highlight for nodes with missing required inputs (#E0B0FF).
-- **Firefly Breathing**: Natural breathing animation algorithm mimicking firefly light patterns.
-- **Performance Mode**: Optimized for low power consumption with minimal resource usage.
-- **Customization**: Fully configurable colors (solid/gradient), breathing speed, size, and brightness.
-
-## Installation
-Place this repository inside ComfyUI’s `custom_nodes` folder:
-```
-ComfyUI/
-└── custom_nodes/
-    └── Comfyui-HAIGC-Extension/
-```
-
-## Usage
-1. Start ComfyUI.
-2. Open Settings.
-3. Locate `HAIGC Highlight` settings and customize.
-
-## Settings
-- **HAIGC Highlight: Mouse Trigger Breathing**  
-  Enable subtle breathing effect on mouse movement (Default: Off).
-
-- **HAIGC Highlight: Auto Breathing**  
-  Enable continuous breathing animation (Default: Off).
-
-- **HAIGC Highlight: Breathing Period (s)**  
-  Speed of the breathing animation.
-
-- **HAIGC Highlight: Color Setting**  
-  - Solid color: `#fafafa`  
-  - Gradient: `#FF0000,#0000FF`  
-  - Presets available.
-
-</details>
+本仓库未单独声明额外许可证时，请按项目实际发布方式使用。
